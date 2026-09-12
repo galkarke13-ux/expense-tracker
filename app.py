@@ -88,6 +88,132 @@ supabase: Client = create_client(
     SUPABASE_KEY
 )
 
+# -------------------------------------------------
+# USER AUTHENTICATION
+# -------------------------------------------------
+
+if "user" not in st.session_state:
+    st.session_state.user = None
+
+if "session" not in st.session_state:
+    st.session_state.user = None
+
+
+def show_login():
+
+    st.title("💰 Personal Expense Tracker")
+
+    tab1, tab2 = st.tabs([
+        "Login",
+        "Sign Up"
+    ])
+
+    # ---------------- LOGIN ----------------
+
+    with tab1:
+
+        st.subheader("Login")
+
+        email = st.text_input(
+            "Email",
+            key="login_email"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password",
+            key="login_password"
+        )
+
+        if st.button(
+            "Login",
+            use_container_width=True
+        ):
+
+            try:
+
+                response = supabase.auth.sign_in_with_password(
+                    {
+                        "email": email,
+                        "password": password
+                    }
+                )
+
+                st.session_state.user = response.user
+                st.session_state.session = response.session
+
+                st.success(
+                    "Login successful!"
+                )
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    f"Login failed: {e}"
+                )
+
+
+    # ---------------- SIGN UP ----------------
+
+    with tab2:
+
+        st.subheader("Create Account")
+
+        new_email = st.text_input(
+            "Email",
+            key="signup_email"
+        )
+
+        new_password = st.text_input(
+            "Password",
+            type="password",
+            key="signup_password"
+        )
+
+        if st.button(
+            "Create Account",
+            use_container_width=True
+        ):
+
+            try:
+
+                response = supabase.auth.sign_up(
+                    {
+                        "email": new_email,
+                        "password": new_password
+                    }
+                )
+
+                st.success(
+                    "Account created! You can now login."
+                )
+
+            except Exception as e:
+
+                st.error(
+                    f"Sign up failed: {e}"
+                )
+
+
+# Show login page if user is not logged in
+if st.session_state.user is None:
+
+    show_login()
+
+    st.stop()
+
+
+# Logged-in user's unique ID
+user_id = str(
+    st.session_state.user.id
+)
+
+supabase.auth.set_session(
+    st.session_state.session.access_token,
+    st.session_state.session.refresh_token
+)
 
 # -------------------------------------------------
 # KEEP ONLY LAST 12 MONTHS OF EXPENSE DATA
@@ -113,7 +239,8 @@ oldest_month_key = (
 
 supabase.table("expenses").delete().eq(
     "user_id",
-    "temporary_user"
+    user_id
+
 ).lt(
     "month_key",
     oldest_month_key
@@ -198,11 +325,11 @@ if st.button(
     if amount > 0:
 
         supabase.table("expenses").insert({
-          "user_id": "temporary_user",
-          "month": current_month,
-          "month_key": current_month_key,
-          "category": category,
-          "amount": float(amount)
+            "user_id": user_id,
+            "month": current_month,
+            "month_key": current_month_key,
+            "category": category,
+            "amount": float(amount)
         }).execute()
 
         st.success("Expense added successfully! 💰")
@@ -223,7 +350,7 @@ response = (
     .table("expenses")
     .select("category, amount")
     .eq("month_key", current_month_key)
-    .eq("user_id", "temporary_user")
+    .eq("user_id", user_id)
     .execute()
 )
 
@@ -507,7 +634,7 @@ response = (
     supabase
     .table("expenses")
     .select("month, month_key, amount")
-    .eq("user_id", "temporary_user")
+    .eq("user_id", user_id)
     .neq("month_key", current_month_key)
     .execute()
 )
