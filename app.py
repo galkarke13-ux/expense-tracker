@@ -1,8 +1,8 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+from supabase import create_client, Client
 
 # -------------------------------------------------
 # PAGE SETTINGS
@@ -77,186 +77,54 @@ st.markdown("""
 
 
 # -------------------------------------------------
-# DATABASE CONNECTION
+# SUPABASE CONNECTION
 # -------------------------------------------------
 
-conn = sqlite3.connect(
-    "expenses.db",
-    check_same_thread=False
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+supabase: Client = create_client(
+    SUPABASE_URL,
+    SUPABASE_KEY
 )
 
-cursor = conn.cursor()
-
 
 # -------------------------------------------------
-# CREATE DATABASE TABLE
+# KEEP ONLY LAST 12 MONTHS OF EXPENSE DATA
 # -------------------------------------------------
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS expenses (
+from datetime import datetime
 
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    month TEXT,
-    month_key TEXT,
-    category TEXT,
-    amount REAL
+current_date = datetime.now()
 
-)
-""")
+current_year = current_date.year
+current_month_number = current_date.month
 
-conn.commit()
+oldest_month_number = current_month_number - 11
+oldest_year = current_year
 
-# -------------------------------------------------
-# ADD month_key COLUMN TO OLD DATABASE
-# -------------------------------------------------
+if oldest_month_number <= 0:
+    oldest_month_number += 12
+    oldest_year -= 1
 
-cursor.execute("PRAGMA table_info(expenses)")
-columns = [column[1] for column in cursor.fetchall()]
-
-if "month_key" not in columns:
-
-    cursor.execute(
-        "ALTER TABLE expenses ADD COLUMN month_key TEXT"
-    )
-
-    conn.commit()
-
-
-# -------------------------------------------------
-# FIX OLD SAVED DATA
-# -------------------------------------------------
-
-cursor.execute("""
-    SELECT id, month
-    FROM expenses
-    WHERE month_key IS NULL
-""")
-
-old_rows = cursor.fetchall()
-
-
-for row_id, month_name in old_rows:
-
-    try:
-
-        converted_date = datetime.strptime(
-            month_name,
-            "%B %Y"
-        )
-
-        month_key = converted_date.strftime(
-            "%Y-%m"
-        )
-
-        cursor.execute("""
-            UPDATE expenses
-            SET month_key = ?
-            WHERE id = ?
-        """, (
-            month_key,
-            row_id
-        ))
-
-    except Exception:
-        pass
-
-
-conn.commit()
-
-
-# -------------------------------------------------
-# KEEP ONLY LAST 12 MONTHS
-# -------------------------------------------------
-
-today = datetime.now()
-
-total_months = (
-    today.year * 12 +
-    today.month
+oldest_month_key = (
+    f"{oldest_year}-{oldest_month_number:02d}"
 )
 
-cutoff_total_months = (
-    total_months - 11
-)
-
-cutoff_year = (
-    cutoff_total_months - 1
-) // 12
-
-cutoff_month = (
-    cutoff_total_months - 1
-) % 12 + 1
-
-cutoff_month_key = (
-    f"{cutoff_year:04d}-{cutoff_month:02d}"
-)
-
-cursor.execute(
-    """
-    DELETE FROM expenses
-    WHERE month_key < ?
-    """,
-    (
-        cutoff_month_key,
-    )
-)
-
-conn.commit()
+supabase.table("expenses").delete().eq(
+    "user_id",
+    "temporary_user"
+).lt(
+    "month_key",
+    oldest_month_key
+).execute()
 
 # -------------------------------------------------
-# ADD month_key COLUMN TO OLD DATABASE
+# CURRENT MONTH
 # -------------------------------------------------
 
-cursor.execute("PRAGMA table_info(expenses)")
-columns = [column[1] for column in cursor.fetchall()]
-
-if "month_key" not in columns:
-
-    cursor.execute(
-        "ALTER TABLE expenses ADD COLUMN month_key TEXT"
-    )
-
-    conn.commit()
-
-
-# -------------------------------------------------
-# FIX OLD SAVED DATA
-# -------------------------------------------------
-
-cursor.execute("""
-    SELECT id, month
-    FROM expenses
-    WHERE month_key IS NULL
-""")
-
-old_rows = cursor.fetchall()
-
-
-for row_id, month_name in old_rows:
-
-    try:
-        converted_date = datetime.strptime(
-            month_name,
-            "%B %Y"
-        )
-
-        month_key = converted_date.strftime("%Y-%m")
-
-        cursor.execute("""
-            UPDATE expenses
-            SET month_key = ?
-            WHERE id = ?
-        """, (
-            month_key,
-            row_id
-        ))
-
-    except:
-        pass
-
-
-conn.commit()
-
+current_month = datetime.now().strftime("%B %Y")
+current_month_key = datetime.now().strftime("%Y-%m")
 
 # -------------------------------------------------
 # CURRENT MONTH
@@ -329,28 +197,13 @@ if st.button(
 
     if amount > 0:
 
-        cursor.execute(
-    """
-    INSERT INTO expenses
-    (
-        month,
-        month_key,
-        category,
-        amount
-    )
-
-    VALUES (?, ?, ?, ?)
-    """,
-
-    (
-        current_month,
-        current_month_key,
-        category,
-        amount
-    )
-)
-
-        conn.commit()
+        supabase.table("expenses").insert({
+          "user_id": "temporary_user",
+          "month": current_month,
+          "month_key": current_month_key,
+          "category": category,
+          "amount": float(amount)
+        }).execute()
 
         st.success("Expense added successfully! 💰")
 
@@ -365,22 +218,33 @@ if st.button(
 # LOAD CURRENT MONTH DATA
 # -------------------------------------------------
 
-df = pd.read_sql_query(
-    """
-    SELECT category,
-           SUM(amount) AS total
-
-    FROM expenses
-
-    WHERE month_key = ?
-
-    GROUP BY category
-    """,
-
-    conn,
-
-    params=(current_month_key,)
+response = (
+    supabase
+    .table("expenses")
+    .select("category, amount")
+    .eq("month_key", current_month_key)
+    .eq("user_id", "temporary_user")
+    .execute()
 )
+
+data = response.data
+
+if data:
+
+    raw_df = pd.DataFrame(data)
+
+    df = (
+        raw_df
+        .groupby("category", as_index=False)["amount"]
+        .sum()
+        .rename(columns={"amount": "total"})
+    )
+
+else:
+
+    df = pd.DataFrame(
+        columns=["category", "total"]
+    )
 
 
 # -------------------------------------------------
@@ -510,6 +374,18 @@ chart_data = chart_data[
     chart_data["Amount"] > 0
 ]
 
+# Remove emoji/symbol from category names for charts
+chart_data = chart_data.copy()
+
+chart_data["Category"] = (
+    chart_data["Category"]
+    .str.replace("🍔 ", "", regex=False)
+    .str.replace("✈️ ", "", regex=False)
+    .str.replace("🛍️ ", "", regex=False)
+    .str.replace("🎬 ", "", regex=False)
+    .str.replace("❤️ ", "", regex=False)
+)
+
 
 # -------------------------------------------------
 # BEAUTIFUL COMPACT PIE CHART
@@ -627,33 +503,46 @@ if not chart_data.empty:
 # PREVIOUS MONTHS
 # -------------------------------------------------
 
-st.divider()
-
-st.subheader("📜 Your Expenses — Previous Months")
-
-
-previous_months = pd.read_sql_query(
-    """
-    SELECT
-        month,
-        month_key,
-        SUM(amount) AS total
-
-    FROM expenses
-
-    WHERE month_key != ?
-
-    GROUP BY
-        month,
-        month_key
-
-    ORDER BY month_key DESC
-    """,
-
-    conn,
-
-    params=(current_month_key,)
+response = (
+    supabase
+    .table("expenses")
+    .select("month, month_key, amount")
+    .eq("user_id", "temporary_user")
+    .neq("month_key", current_month_key)
+    .execute()
 )
+
+previous_data = response.data
+
+if previous_data:
+
+    previous_df = pd.DataFrame(previous_data)
+
+    previous_months = (
+        previous_df
+        .groupby(
+            ["month", "month_key"],
+            as_index=False
+        )["amount"]
+        .sum()
+        .rename(
+            columns={"amount": "total"}
+        )
+        .sort_values(
+            "month_key",
+            ascending=False
+        )
+    )
+
+else:
+
+    previous_months = pd.DataFrame(
+        columns=[
+            "month",
+            "month_key",
+            "total"
+        ]
+    )
 
 
 if previous_months.empty:
