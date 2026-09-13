@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from supabase import create_client, Client
 
+
 # -------------------------------------------------
 # PAGE SETTINGS
 # -------------------------------------------------
@@ -87,133 +88,8 @@ supabase: Client = create_client(
     SUPABASE_URL,
     SUPABASE_KEY
 )
-
-# -------------------------------------------------
-# USER AUTHENTICATION
-# -------------------------------------------------
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-if "session" not in st.session_state:
-    st.session_state.user = None
-
-
-def show_login():
-
-    st.title("💰 Personal Expense Tracker")
-
-    tab1, tab2 = st.tabs([
-        "Login",
-        "Sign Up"
-    ])
-
-    # ---------------- LOGIN ----------------
-
-    with tab1:
-
-        st.subheader("Login")
-
-        email = st.text_input(
-            "Email",
-            key="login_email"
-        )
-
-        password = st.text_input(
-            "Password",
-            type="password",
-            key="login_password"
-        )
-
-        if st.button(
-            "Login",
-            use_container_width=True
-        ):
-
-            try:
-
-                response = supabase.auth.sign_in_with_password(
-                    {
-                        "email": email,
-                        "password": password
-                    }
-                )
-
-                st.session_state.user = response.user
-                st.session_state.session = response.session
-
-                st.success(
-                    "Login successful!"
-                )
-
-                st.rerun()
-
-            except Exception as e:
-
-                st.error(
-                    f"Login failed: {e}"
-                )
-
-
-    # ---------------- SIGN UP ----------------
-
-    with tab2:
-
-        st.subheader("Create Account")
-
-        new_email = st.text_input(
-            "Email",
-            key="signup_email"
-        )
-
-        new_password = st.text_input(
-            "Password",
-            type="password",
-            key="signup_password"
-        )
-
-        if st.button(
-            "Create Account",
-            use_container_width=True
-        ):
-
-            try:
-
-                response = supabase.auth.sign_up(
-                    {
-                        "email": new_email,
-                        "password": new_password
-                    }
-                )
-
-                st.success(
-                    "Account created! You can now login."
-                )
-
-            except Exception as e:
-
-                st.error(
-                    f"Sign up failed: {e}"
-                )
-
-
-# Show login page if user is not logged in
-if st.session_state.user is None:
-
-    show_login()
-
-    st.stop()
-
-
-# Logged-in user's unique ID
-user_id = str(
-    st.session_state.user.id
-)
-
-supabase.auth.set_session(
-    st.session_state.session.access_token,
-    st.session_state.session.refresh_token
-)
+# Personal Expense Tracker user
+user_id = "YOUR_EXISTING_USER_ID"
 
 # -------------------------------------------------
 # KEEP ONLY LAST 12 MONTHS OF EXPENSE DATA
@@ -237,11 +113,7 @@ oldest_month_key = (
     f"{oldest_year}-{oldest_month_number:02d}"
 )
 
-supabase.table("expenses").delete().eq(
-    "user_id",
-    user_id
-
-).lt(
+supabase.table("expenses").delete().lt(
     "month_key",
     oldest_month_key
 ).execute()
@@ -325,11 +197,11 @@ if st.button(
     if amount > 0:
 
         supabase.table("expenses").insert({
-            "user_id": user_id,
-            "month": current_month,
-            "month_key": current_month_key,
-            "category": category,
-            "amount": float(amount)
+          "user_id" : user_id,
+          "month": current_month,
+          "month_key": current_month_key,
+          "category": category,
+          "amount": float(amount)
         }).execute()
 
         st.success("Expense added successfully! 💰")
@@ -350,7 +222,6 @@ response = (
     .table("expenses")
     .select("category, amount")
     .eq("month_key", current_month_key)
-    .eq("user_id", user_id)
     .execute()
 )
 
@@ -396,6 +267,7 @@ for cat in categories:
         expense_totals[cat] = 0
 
 
+
 # -------------------------------------------------
 # SHOW CURRENT MONTH EXPENSES
 # -------------------------------------------------
@@ -423,7 +295,63 @@ for cat, total in expense_totals.items():
         unsafe_allow_html=True
     )
 
+# -------------------------------------------------
+# EDIT CATEGORY AMOUNT
+# -------------------------------------------------
 
+st.divider()
+
+st.subheader("✏️ Edit Category Amount")
+
+edit_category = st.selectbox(
+    "Choose Category",
+    categories,
+    key="edit_category_total"
+)
+
+current_amount = expense_totals[edit_category]
+
+st.write(
+    f"Current amount: ₹{current_amount:,.0f}"
+)
+
+new_amount = st.number_input(
+    "New Amount (₹)",
+    min_value=0.0,
+    value=float(current_amount),
+    step=10.0,
+    key="edit_category_amount"
+)
+
+if st.button(
+    "💾 SAVE NEW AMOUNT",
+    use_container_width=True
+):
+
+    # Remove all existing expenses
+    # of this category for the current month
+    supabase.table("expenses").delete().eq(
+        "month_key",
+        current_month_key
+    ).eq(
+        "category",
+        edit_category
+    ).execute()
+
+    # Add the new total amount
+    if new_amount > 0:
+
+        supabase.table("expenses").insert({
+            "user_id": user_id,
+            "month": current_month,
+            "month_key": current_month_key,
+            "category": edit_category,
+            "amount": float(new_amount)
+        }).execute()
+
+    st.success("Amount updated successfully! ✨")
+
+    st.rerun()
 # -------------------------------------------------
 # TOTAL SPENT
 # -------------------------------------------------
@@ -634,7 +562,6 @@ response = (
     supabase
     .table("expenses")
     .select("month, month_key, amount")
-    .eq("user_id", user_id)
     .neq("month_key", current_month_key)
     .execute()
 )
