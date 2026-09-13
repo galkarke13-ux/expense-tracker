@@ -182,10 +182,9 @@ category = st.selectbox(
 )
 
 
-amount = st.number_input(
+amount_input = st.text_input(
     "Enter Amount (₹)",
-    min_value=0.0,
-    step=10.0
+    placeholder="Enter amount"
 )
 
 
@@ -194,22 +193,47 @@ if st.button(
     use_container_width=True
 ):
 
-    if amount > 0:
+    try:
 
-        supabase.table("expenses").insert({
-          "user_id" : user_id,
-          "month": current_month,
-          "month_key": current_month_key,
-          "category": category,
-          "amount": float(amount)
-        }).execute()
+        # Check if input is empty
+        if not amount_input.strip():
 
-        st.success("Expense added successfully! 💰")
+            st.warning(
+                "Please enter an amount."
+            )
 
-    else:
+        else:
 
-        st.warning(
-            "Please enter an amount greater than ₹0."
+            amount = float(
+                amount_input
+            )
+
+            if amount > 0:
+
+                supabase.table("expenses").insert({
+                    "user_id": user_id,
+                    "month": current_month,
+                    "month_key": current_month_key,
+                    "category": category,
+                    "amount": amount
+                }).execute()
+
+                st.success(
+                    "Expense added successfully! 💰"
+                )
+
+                st.rerun()
+
+            else:
+
+                st.warning(
+                    "Please enter an amount greater than ₹0."
+                )
+
+    except ValueError:
+
+        st.error(
+            "Please enter a valid number."
         )
 
 
