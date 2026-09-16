@@ -659,8 +659,43 @@ else:
         )
 
 
+# Your existing code
+# ...
+# Previous months
+# ...
+# Charts
+# ...
 
+# ↓ VERY LAST CODE IN app.py
 
+st.markdown(
+    """
+    <div style="
+        text-align: center;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: #888;
+    ">
+        <svg width="11" height="11"
+             viewBox="0 0 24 24"
+             style="vertical-align: -1px;">
+            <rect x="3" y="3" width="18" height="18"
+                  rx="5" fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"/>
+            <circle cx="12" cy="12" r="4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"/>
+            <circle cx="17.5" cy="6.5" r="1"
+                    fill="currentColor"/>
+        </svg>
+        &nbsp;vaibhav3593ff
+    </div>
+    """,
+    unsafe_allow_html=True
+)
         
 
 
