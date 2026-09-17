@@ -107,6 +107,10 @@ PROFILES = {
     "Aditya": {
         "user_id": "dee4a411-c65b-4bbc-b88d-38f76d27bd08",
         "pin": "5644"
+    },
+    "Test user": {
+                "user_id": "1136ffe3-475d-4e6a-8326-6c17dc0e7c81",
+                "pin": "1234"
     }
 }
 
@@ -119,7 +123,7 @@ if st.session_state.selected_profile is None:
 
     profile = st.selectbox(
         "Select your profile",
-        ["Vaibhav", "Khusbu", "Ayush","Aditya"]
+        ["Vaibhav", "Khusbu", "Ayush","Aditya","Test user"]
     )
 
     pin = st.text_input(
