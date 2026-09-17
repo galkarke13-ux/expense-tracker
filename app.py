@@ -92,7 +92,7 @@ supabase: Client = create_client(
 # Personal Expense Tracker user
 
 PROFILES = {
-    "Vaibhav": {
+    "test user 1": {
         "user_id": "a92f9e6d-c9b1-47e5-bbfe-58550861d2b9",
         "pin": "3593"
     },
@@ -108,7 +108,7 @@ PROFILES = {
         "user_id": "dee4a411-c65b-4bbc-b88d-38f76d27bd08",
         "pin": "5644"
     },
-    "Test user": {
+    "Test user 2": {
                 "user_id": "1136ffe3-475d-4e6a-8326-6c17dc0e7c81",
                 "pin": "1234"
     }
