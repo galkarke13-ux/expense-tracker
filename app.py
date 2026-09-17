@@ -115,7 +115,12 @@ PROFILES = {
 }
 
 if "selected_profile" not in st.session_state:
-    st.session_state.selected_profile = st.query_params.get("profile")
+    saved_profile = st.query_params.get("profile")
+
+    if saved_profile in PROFILES:
+        st.session_state.selected_profile = saved_profile
+    else:
+        st.session_state.selected_profile = None
 
 if st.session_state.selected_profile is None:
 
