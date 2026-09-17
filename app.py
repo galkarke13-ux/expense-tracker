@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -89,7 +90,59 @@ supabase: Client = create_client(
     SUPABASE_KEY
 )
 # Personal Expense Tracker user
-user_id = "YOUR_EXISTING_USER_ID"
+
+PROFILES = {
+    "Vaibhav": {
+        "user_id": "a92f9e6d-c9b1-47e5-bbfe-58550861d2b9",
+        "pin": "3593"
+    },
+    "Khusbu": {
+        "user_id": "a4b83d7e-7438-4689-b77a-1849e6f3e245",
+        "pin": "7000"
+    },
+    "Ayush": {
+        "user_id": "35b7eeee-f1b7-4ab5-9990-2830a4450d12",
+        "pin": "9302"
+    }
+}
+
+if "selected_profile" not in st.session_state:
+    st.session_state.selected_profile = st.query_params.get("profile")
+
+if st.session_state.selected_profile is None:
+
+    st.title("Personal Expense Tracker")
+
+    profile = st.selectbox(
+        "Select your profile",
+        ["Vaibhav", "Khusbu", "Ayush"]
+    )
+
+    pin = st.text_input(
+        "Enter 4-digit PIN",
+        type="password",
+        max_chars=4
+    )
+
+    if st.button("Continue"):
+
+      if pin == PROFILES[profile]["pin"]:
+        st.session_state.selected_profile = profile
+        st.session_state.welcome_message = f"👋 Welcome back, {profile}!"
+        st.query_params["profile"] = profile
+        st.rerun()
+      else:
+        st.error("Incorrect PIN")
+
+    st.stop()
+
+user_id = PROFILES[st.session_state.selected_profile]["user_id"]
+
+
+if "welcome_message" in st.session_state:
+    st.success(st.session_state.welcome_message)
+
+
 
 # -------------------------------------------------
 # KEEP ONLY LAST 12 MONTHS OF EXPENSE DATA
@@ -241,15 +294,18 @@ if st.button(
 # LOAD CURRENT MONTH DATA
 # -------------------------------------------------
 
+
 response = (
     supabase
     .table("expenses")
     .select("category, amount")
     .eq("month_key", current_month_key)
+    .eq("user_id", user_id)
     .execute()
 )
-
 data = response.data
+
+
 
 if data:
 
@@ -355,11 +411,14 @@ if st.button(
     # Remove all existing expenses
     # of this category for the current month
     supabase.table("expenses").delete().eq(
-        "month_key",
-        current_month_key
+    "month_key",
+    current_month_key
     ).eq(
-        "category",
-        edit_category
+    "category",
+    edit_category
+    ).eq(
+    "user_id",
+    user_id
     ).execute()
 
     # Add the new total amount
@@ -587,6 +646,7 @@ response = (
     .table("expenses")
     .select("month, month_key, amount")
     .neq("month_key", current_month_key)
+    .eq("user_id", user_id)
     .execute()
 )
 
