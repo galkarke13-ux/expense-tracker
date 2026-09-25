@@ -92,9 +92,9 @@ supabase: Client = create_client(
 # Personal Expense Tracker user
 
 PROFILES = {
-    "Test": {
+    "Krishna": {
         "user_id": "a92f9e6d-c9b1-47e5-bbfe-58550861d2b9",
-        "pin": "3593"
+        "pin": "7000"
     },
     "Khusbu": {
         "user_id": "a4b83d7e-7438-4689-b77a-1849e6f3e245",
@@ -128,7 +128,7 @@ if st.session_state.selected_profile is None:
 
     profile = st.selectbox(
         "Select your profile",
-        ["Test", "Khusbu", "Ayush","Aditya","Test user"]
+        ["Krishna", "Khusbu", "Ayush","Aditya","Test user"]
     )
 
     pin = st.text_input(
